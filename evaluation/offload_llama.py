@@ -484,10 +484,10 @@ def convert_kvcache_llama_offloading(model, config, heavy_const=256, group_facto
 
 def convert_llama_offloading_channel_config(model, channel_config, selected_channel="k"):
 
-    selected_channel = "." + selected_channel + "_proj"
+    selected_channel = "" #"." + selected_channel + "_proj"
 
     for name, module in model.named_modules():
-
+        print(name)
         if isinstance(module, LlamaAttention_offloading):
             device = next(module.parameters()).device
             module.sorted_channel = torch.tensor(channel_config[name + selected_channel]).to(device)

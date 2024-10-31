@@ -3,8 +3,8 @@ import torch
 from torch import nn
 from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoConfig
 from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, LlamaAttention, apply_rotary_pos_emb, repeat_kv
-from transformers.models.mistral.modeling_mistral import MistralAttention
-from transformers.models.mixtral.modeling_mixtral import MixtralAttention
+# from transformers.models.mistral.modeling_mistral import MistralAttention
+# from transformers.models.mixtral.modeling_mixtral import MixtralAttention
 from datasets import load_dataset
 from functools import partial
 import tqdm
@@ -108,7 +108,7 @@ def get_calib_qk_feat(model, tokenizer):
 
     hooks = []
     for name, m in model.named_modules():
-        if isinstance(m, LlamaAttention) or isinstance(m, MistralAttention) or isinstance(m, MixtralAttention):
+        if isinstance(m, LlamaAttention):# or isinstance(m, MistralAttention) or isinstance(m, MixtralAttention):
             hooks.append(
                 m.register_forward_hook(
                     partial(stat_qk_max_hook, name=name), with_kwargs=True))
@@ -127,7 +127,7 @@ def get_calib_qk_feat(model, tokenizer):
         hook.remove()
     return output_dict
 
-# model_path = "meta-llama/Llama-2-7b-hf"
+model_path = "meta-llama/Llama-2-7b-hf"
 # model_path = "/home/ec2-user/.cache/huggingface/hub/models--huggyllama--llama-7b/snapshots/8416d3fefb0cb3ff5775a7b13c1692d10ff1aa16"
 # model_path = "/home/ec2-user/.cache/huggingface/hub/models--facebook--opt-6.7b/snapshots/a45aa65bbeb77c1558bc99bedc6779195462dab0"
 # model_path = "/home/ec2-user/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-chat-hf/snapshots/94b07a6e30c3292b8265ed32ffdeccfdadf434a8"
@@ -135,7 +135,7 @@ def get_calib_qk_feat(model, tokenizer):
 # model_path = "mistralai/Mistral-7B-v0.1"
 # model_path = "meta-llama/Llama-2-70b-chat-hf"
 # model_path = "meta-llama/Llama-2-70b-hf"
-model_path = "mistralai/Mixtral-8x7B-v0.1"
+# model_path = "mistralai/Mixtral-8x7B-v0.1"
 
 
 kwargs = {"torch_dtype": torch.float16, "device_map": "auto"}
@@ -154,5 +154,7 @@ for k, v in output_dict.items():
     vals, inds = torch.sort(output_dict[k], dim=-1, descending=True)
     channel_config[k] = inds.tolist()
 
-with open("mixtral-8x7b-qk-channel-config.json", "w") as f:
+with open("llama2-7b-qk-channel-config.json", "w") as f:
     json.dump(channel_config, f)
+# with open("mixtral-8x7b-qk-channel-config.json", "w") as f:
+#     json.dump(channel_config, f)

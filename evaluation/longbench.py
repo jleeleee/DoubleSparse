@@ -69,20 +69,19 @@ def evaluate_model_on_longbench(model, tokenizer, device, dataset, category_name
     all_predictions = []
     all_references = []
 
-    with torch.no_grad():
-        for entry in tqdm(dataset, desc="Evaluating"):
-            question = entry["question"]
-            correct_answer = entry["answer"]
+    for entry in tqdm(dataset, desc="Evaluating"):
+        question = entry["question"]
+        correct_answer = entry["answer"]
 
-            # Tokenize single question
-            inputs = tokenizer(question, return_tensors="pt").to(device)
+        prompt = question
 
-            # Generate model output
-            outputs = model.generate(**inputs, max_new_tokens=10)"  # Reducing max_new_tokens to 10 to manage memory usage  # Limiting max_new_tokens to reduce memory usage
-            predicted_answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Generate model output
+        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        outputs = model.generate(**inputs, max_new_tokens=50)
+        predicted_answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-            all_predictions.append(predicted_answer)
-            all_references.append(correct_answer)
+        all_predictions.append(predicted_answer)
+        all_references.append(correct_answer)
 
     # Calculate the score using the appropriate metric function
     score = metric_fn(all_predictions, all_references)

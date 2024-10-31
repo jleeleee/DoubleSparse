@@ -26,6 +26,7 @@ def convert_hf_checkpoint(
 
     # Load the json file containing weight mapping
     model_map_json = checkpoint_dir / "pytorch_model.bin.index.json"
+    print(model_map_json)
     assert model_map_json.is_file()
 
     with open(model_map_json) as json_map:
