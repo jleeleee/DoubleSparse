@@ -180,6 +180,11 @@ def evaluate(ntrain, subject, model, tokenizer, dev_df, test_df, sparsity_level=
 
         inputs = tokenizer([prompt])
         inputs = {k: torch.tensor(v).to(device) for k, v in inputs.items()}
+        print(inputs.items())
+        for k, v in inputs.items():
+            print(f"{k}:{v.dtype}")
+        raise RuntimeError("b")
+
         seq_len_sum += inputs["input_ids"].shape[-1]
         model = change_llama_offloading_heavy_const(model, inputs["input_ids"].shape[-1] // sparsity_level, (sparsity_level - 1) // 4 + 1, 4)
         # model = change_llama_offloading_heavy_const(model, inputs["input_ids"].shape[-1] // sparsity_level, 2, 2)
@@ -188,6 +193,7 @@ def evaluate(ntrain, subject, model, tokenizer, dev_df, test_df, sparsity_level=
             do_sample=False,
             max_new_tokens=4,
         )
+        print(output_ids)
         output_ids = output_ids[0][len(inputs["input_ids"][0]) :]
         output = tokenizer.decode(
             output_ids, skip_special_tokens=True, spaces_between_special_tokens=False
@@ -206,7 +212,7 @@ def evaluate(ntrain, subject, model, tokenizer, dev_df, test_df, sparsity_level=
 
 
 def main(model, tokenizer, device, sparsity_level=16):
-    data_dir = "/home/jlee436/data/evals/mmlu"
+    data_dir = "/scratch/jlee436/data/evals/mmlu/data/"
     ntrain = 15
 
     # model, tokenizer = load_model(
