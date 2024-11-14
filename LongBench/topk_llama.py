@@ -8,6 +8,12 @@ from transformers.cache_utils import Cache
 import logging
 
 ##
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+import logging
+from typing import Optional, Tuple
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -60,6 +66,7 @@ class LlamaTopKAttention(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
         bsz, q_len, _ = hidden_states.size()
 
+
         if self.config.pretraining_tp > 1:
             key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
             query_slices = self.q_proj.weight.split(
@@ -81,6 +88,11 @@ class LlamaTopKAttention(nn.Module):
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
+
+            # Ensure same dtype for operations
+            query_states = query_states.to(hidden_states.dtype)
+            key_states = key_states.to(hidden_states.dtype)
+            value_states = value_states.to(hidden_states.dtype)
 
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, -1, self.num_key_value_heads, self.head_dim).transpose(1, 2)
