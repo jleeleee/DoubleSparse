@@ -152,7 +152,7 @@ class LlamaTopKAttention(nn.Module):
 
             if isinstance(module, LlamaAttention):
                 device = next(module.parameters()).device
-                new_module = LlamaTopKAttention(config, module.layer_idx).to(device)
+                new_module = LlamaTopKAttention(config, module.layer_idx).half().to(device)
                 new_module.load_state_dict(module.state_dict(), strict=True)
                 model._modules[name] = new_module
 
