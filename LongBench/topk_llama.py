@@ -144,15 +144,16 @@ class LlamaTopKAttention(nn.Module):
     
     @staticmethod
     def convert_llama_attention_to_top_k(model: nn.Module, config: LlamaConfig, top_k: int = 5) -> nn.Module:
-        """Convert all LlamaAttention layers in the model to LlamaTopKAttention."""
-        for name, module in reversed(model._modules.items()):
-            if len(list(module.children())) > 0:
-                model._modules[name] = LlamaTopKAttention.convert_llama_attention_to_top_k(module, config, top_k)
-
-            if isinstance(module, LlamaAttention):
-                device = next(module.parameters()).device
-                new_module = LlamaTopKAttention(config, module.layer_idx).to(device)
-                new_module.load_state_dict(module.state_dict(), strict=False)
-                model._modules[name] = new_module
-
         return model
+        """Convert all LlamaAttention layers in the model to LlamaTopKAttention."""
+        # for name, module in reversed(model._modules.items()):
+        #     if len(list(module.children())) > 0:
+        #         model._modules[name] = LlamaTopKAttention.convert_llama_attention_to_top_k(module, config, top_k)
+
+        #     if isinstance(module, LlamaAttention):
+        #         device = next(module.parameters()).device
+        #         new_module = LlamaTopKAttention(config, module.layer_idx).to(device)
+        #         new_module.load_state_dict(module.state_dict(), strict=False)
+        #         model._modules[name] = new_module
+
+        # return model
