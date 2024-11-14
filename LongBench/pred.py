@@ -18,7 +18,7 @@ import argparse
 #     replace_mistral_attn_with_flash_attn,
 # )
 from quest_attention import enable_quest_attention_eval
-from topk_llama import convert_llama_attention_to_top_k
+from topk_llama import LlamaTopKAttention
 from modify_llama import convert_kvcache_llama_heavy_recent, convert_llama_channel_config, change_llama_heavy_const
 from h2o_llama import convert_h2o, reset_h2o
 from streaming_llama import convert_streaming
@@ -305,7 +305,7 @@ def load_model_and_tokenizer(path, model_name, device):
     
     if args.topk:
         config = AutoConfig.from_pretrained(path)
-        model = convert_llama_attention_to_top_k(model, config, args.topk)
+        model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config, args.topk)
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)
