@@ -319,7 +319,7 @@ if __name__ == "__main__":
     args = parse_args()
     model2path = json.load(open("config/model2path.json", "r"))
     model2maxlen = json.load(open("config/model2maxlen.json", "r"))
-    device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_name = args.model
     # define your model
     model, tokenizer = load_model_and_tokenizer(

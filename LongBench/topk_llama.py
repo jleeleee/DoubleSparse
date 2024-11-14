@@ -21,7 +21,6 @@ logging.basicConfig(level=logging.INFO)
 
 class LlamaTopKAttention(nn.Module):
     """Multi-headed attention with Top-K mechanism."""
-
     def __init__(self, config: LlamaConfig, layer_idx: Optional[int] = None):
         super().__init__()
         self.config = config
@@ -61,11 +60,9 @@ class LlamaTopKAttention(nn.Module):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
-        top_k: int = 5,  # Number of top-k values to consider
         **kwargs,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
-
 
         if self.config.pretraining_tp > 1:
             key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -89,14 +86,9 @@ class LlamaTopKAttention(nn.Module):
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
 
-            # Ensure same dtype for operations
-            query_states = query_states.to(hidden_states.dtype)
-            key_states = key_states.to(hidden_states.dtype)
-            value_states = value_states.to(hidden_states.dtype)
-
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, -1, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, -1, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         if position_embeddings is None:
             logger.warning(
@@ -119,18 +111,23 @@ class LlamaTopKAttention(nn.Module):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
-        # Implement Top-K attention
-        top_k_values, top_k_indices = torch.topk(attn_weights, k=top_k, dim=-1)
-        top_k_values = top_k_values.softmax(dim=-1)
+        if attention_mask is not None:  # no matter the length, we just slice it
+            causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+            attn_weights = attn_weights + causal_mask
 
-        # Gather the top-k values from the value states
-        batch_indices = torch.arange(bsz, device=top_k_indices.device).view(-1, 1, 1, 1)
-        head_indices = torch.arange(self.num_heads, device=top_k_indices.device).view(1, -1, 1, 1)
-        value_states_top_k = value_states[batch_indices, head_indices, top_k_indices]
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+        attn_output = torch.matmul(attn_weights, value_states)
 
-        attn_output = torch.matmul(top_k_values.unsqueeze(-2), value_states_top_k).squeeze(-2)
+        if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+            raise ValueError(
+                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+                f" {attn_output.size()}"
+            )
 
         attn_output = attn_output.transpose(1, 2).contiguous()
+
         attn_output = attn_output.reshape(bsz, q_len, -1)
 
         if self.config.pretraining_tp > 1:
@@ -144,17 +141,7 @@ class LlamaTopKAttention(nn.Module):
             attn_weights = None
 
         return attn_output, attn_weights, past_key_value
-
-    def convert_weights(self, state_dict: dict) -> dict:
-        """Convert the entire model of LlamaAttention to use Top-K attention."""
-        converted_state_dict = {}
-        for key, value in state_dict.items():
-            if "q_proj" in key or "k_proj" in key or "v_proj" in key or "o_proj" in key:
-                converted_state_dict[key] = value
-            else:
-                converted_state_dict[key] = value
-        return converted_state_dict
-
+    
     @staticmethod
     def convert_llama_attention_to_top_k(model: nn.Module, config: LlamaConfig, top_k: int = 5) -> nn.Module:
         """Convert all LlamaAttention layers in the model to LlamaTopKAttention."""
