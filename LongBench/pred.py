@@ -18,6 +18,7 @@ import argparse
 #     replace_mistral_attn_with_flash_attn,
 # )
 from quest_attention import enable_quest_attention_eval
+from topk_llama import convert_llama_attention_to_top_k
 from modify_llama import convert_kvcache_llama_heavy_recent, convert_llama_channel_config, change_llama_heavy_const
 from h2o_llama import convert_h2o, reset_h2o
 from streaming_llama import convert_streaming
@@ -57,6 +58,7 @@ def parse_args(args=None):
     parser.add_argument("--ds", action="store_true", help="Enable Double Sparsity Attention")
     parser.add_argument("--h2o", action="store_true", help="Enable H2O Attention")
     parser.add_argument("--streaming", action="store_true", help="Enable StreamingLLM Attention")
+    parser.add_argument("--topk", action="store_true", help="Enable TopK Attention")
 
     return parser.parse_args(args)
 
@@ -288,7 +290,7 @@ def load_model_and_tokenizer(path, model_name, device):
         enable_quest_attention_eval(model, args)
         
     if args.ds:
-        channel_path = "/home/andy/DoubleSparse-backup/config/" + path + ".json"
+        channel_path = "/home/jlee436/DoubleSparse/config/" + path + ".json"
         config = AutoConfig.from_pretrained(path)
         channel_config = None
         with open(channel_path, "r") as f:
@@ -300,6 +302,10 @@ def load_model_and_tokenizer(path, model_name, device):
         config = AutoConfig.from_pretrained(path)
         config.cache_budget = args.token_budget
         model = convert_h2o(model, config)
+    
+    if args.topk:
+        config = AutoConfig.from_pretrained(path)
+        model = convert_llama_attention_to_top_k(model, config, args.topk)
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)

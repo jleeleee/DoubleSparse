@@ -5,7 +5,7 @@ do
 
     for budget in 256 512 1024 2048 4096
     do
-        CUDA_VISIBLE_DEVICES=3 python -u pred.py \
+        python -u pred.py \
             --model $model --task $task \
             --ds --heavy_const $budget --group_factor 2 --q_bits 2 --channel q
     done
