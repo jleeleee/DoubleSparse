@@ -305,7 +305,7 @@ def load_model_and_tokenizer(path, model_name, device):
     
     if args.topk:
         config = AutoConfig.from_pretrained(path)
-        model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config, args.topk)
+        model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config)
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)
