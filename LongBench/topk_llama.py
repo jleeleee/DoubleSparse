@@ -88,7 +88,8 @@ class LlamaTopKAttention(LlamaAttention):
 
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        _, topk_indices = torch.topk(attn_weights, k=self.top_k, dim=-1)
+        k_keep = min(attn_weights.shape[-1], self.top_k)
+        _, topk_indices = torch.topk(attn_weights, k=k_keep, dim=-1)
         mask = torch.zeros_like(attn_weights, dtype=torch.bool)
         mask.scatter_(dim=-1, index=topk_indices, src=torch.ones_like(topk_indices, dtype=torch.bool))
         attn_weights = attn_weights.masked_fill(~mask, float('-inf'))

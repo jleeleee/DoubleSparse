@@ -305,7 +305,10 @@ def load_model_and_tokenizer(path, model_name, device):
     
     if args.topk:
         config = AutoConfig.from_pretrained(path)
-        model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config)
+        k = args.token_budget
+        model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config, top_k=k)
+
+
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)
@@ -366,6 +369,8 @@ if __name__ == "__main__":
                 out_path = f"pred_e/{model_name}/{dataset}-h2o-{args.token_budget}.jsonl"
             elif args.streaming:
                 out_path = f"pred_e/{model_name}/{dataset}-streaming-{args.token_budget}.jsonl"
+            elif args.topk:
+                out_path = f"pred_e/{model_name}/{dataset}-topk-{args.token_budget}.jsonl"
             else:
                 out_path = f"pred_e/{model_name}/{dataset}.jsonl"
         else:
@@ -380,6 +385,8 @@ if __name__ == "__main__":
                 out_path = f"pred/{model_name}/{dataset}-h2o-{args.token_budget}.jsonl"
             elif args.streaming:
                 out_path = f"pred/{model_name}/{dataset}-streaming-{args.token_budget}.jsonl"
+            elif args.topk:
+                out_path = f"pred/{model_name}/{dataset}-topk-{args.token_budget}.jsonl"
             else:
                 out_path = f"pred/{model_name}/{dataset}.jsonl"
         prompt_format = dataset2prompt[dataset]
