@@ -194,14 +194,12 @@ def get_pred(
                 # NOTE for h2o
                 if args.h2o:
                     reset_h2o(model)
-                print(datetime.now())
                 output = model(
                     input_ids=input.input_ids,
                     past_key_values=None,
                     use_cache=True,
                 )
                 past_key_values = output.past_key_values
-                print(datetime.now())
                 
                 for input_id in q_input.input_ids[0]:
                     # with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], with_stack=True, record_shapes=True) as prof:
@@ -213,7 +211,6 @@ def get_pred(
                     )
                     past_key_values = output.past_key_values
 
-                print(datetime.now())
                 pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                 generated_content = [pred_token_idx.item()]
                 for _ in range(max_gen - 1):
