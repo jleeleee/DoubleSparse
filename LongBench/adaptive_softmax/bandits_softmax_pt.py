@@ -13,13 +13,16 @@ def generate_weighted_permutation(weights: torch.Tensor, gen=None):
     @param gen: The random number generator seed
     @return: The permutation, the logits, and the perturbed logits
     """
-    assert torch.all(weights >= 0), 'Weights must be non-negative'
+    # print(weights)
+    # assert torch.all(weights >= 0), 'Weights must be non-negative'
     
     if gen is not None:
         torch.manual_seed(gen)
 
     # Handle log(0) safely by using masked operations
     total_weight = weights.sum()
+    # print(weights)
+    # print(total_weight)
     mask = weights > 0
     logits = torch.full_like(weights, float('-inf'))
     logits[mask] = torch.log(weights[mask]) - torch.log(total_weight)
@@ -60,13 +63,12 @@ class BanditsSoftmax:
     seed : int, optional
         The seed for random number generation (default 42)
     """
-class BanditsSoftmax:
     def __init__(
         self,
         A: torch.Tensor,
         temperature: float = 1.0,
         noise_bound: float = None,
-        atom_importance_sampling=True,
+        atom_importance_sampling=False,
         query_importance_sampling=True,
         randomized_hadamard_transform=False,
         verbose=False,
@@ -101,7 +103,7 @@ class BanditsSoftmax:
         if atom_importance_sampling:
             self._atom_weights = torch.sum(torch.abs(self._A), dim=0)
         else:
-            self._atom_weights = torch.ones(self.d, device=self.device, dtype=self.dtype)
+            self._atom_weights = torch.ones(self.d, device=self.device)
             
         self._permutation, self._logits, self._perturbed_logits = generate_weighted_permutation(self._atom_weights, gen=seed)
         
@@ -116,7 +118,7 @@ class BanditsSoftmax:
         self._xp = None
 
         # Initialize arrays with consistent dtype
-        self._it = torch.zeros(self.n, dtype=torch.int64, device=self.device)
+        self._it = torch.zeros(self.n, dtype=torch.int, device=self.device)
         self._estimates = torch.zeros(self.n, dtype=self.dtype, device=self.device)
         self._var = torch.full((self.n,), float('inf'), dtype=self.dtype, device=self.device)
 
@@ -170,13 +172,13 @@ class BanditsSoftmax:
         if self.randomized_hadamard_transform:
             assert x.size(0) <= self.d, 'Query vector must be of size d or less if padding was performed'
         else:
-            assert x.size(0) == self.d, 'Query vector must be of size d'
+            assert x.size(0) == self.d, f'Query vector must be of size {self.d} was x.size(0)={x.size(0)}'
 
         torch.manual_seed(seed)
 
         self._it = torch.zeros(self.n, dtype=torch.int64, device=self.device)
-        self._estimates = torch.zeros(self.n, dtype=torch.float64, device=self.device)
-        self._var = torch.full((self.n,), float('inf'), dtype=torch.float64, device=self.device)
+        self._estimates = torch.zeros(self.n, dtype=torch.float32, device=self.device)
+        self._var = torch.full((self.n,), float('inf'), dtype=torch.float32, device=self.device)
 
         self._x = torch.nn.functional.pad(x, (0, self.d - x.size(0)), 'constant', 0)
 
@@ -191,7 +193,7 @@ class BanditsSoftmax:
         
         self._xp = self._x[self._permutation].clone()
 
-        self._num_sparse_columns = torch.sum(torch.isinf(self._logits) & (self._logits < 0)).item()
+        self._num_sparse_columns = torch.sum(self._logits == float('-inf')).item()
         n_nonzero = self.d - self._num_sparse_columns
         
         if self.query_importance_sampling:
@@ -206,17 +208,26 @@ class BanditsSoftmax:
 
     def exact_values(self, arms: torch.Tensor) -> torch.Tensor:
         """
-        Compute the exact value for the specified arms.
+        Compute the exact value for the specified arms using efficient PyTorch operations.
         
         @param arms: The arms for which to compute the exact value
         @return: The exact values of the specified arms
         """
         assert self._x is not None, 'Query vector not set'
-
+        
         mask = self.it[arms] < self.max_pulls
         if torch.any(mask):
-            A_arms = self._A[arms, self._permutation] if self._Ap is None else self._Ap[arms]
-            self._estimates[arms] = (A_arms @ self._xp) * self.temperature
+            if self._Ap is None:
+                # Keep the same logical order as original code
+                A_selected = self._A[arms]  # First get the arms
+                # Then apply permutation to each selected arm's values
+                A_arms = A_selected[:, self._permutation]
+            else:
+                A_arms = self._Ap[arms]
+                
+            # Keep original matrix multiplication
+            result = (A_arms @ self._xp) * self.temperature
+            self._estimates[arms] = result.to(dtype=self._estimates.dtype)
             self._it[arms] = self.max_pulls
             self._var[arms] = 0
         

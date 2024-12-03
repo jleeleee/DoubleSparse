@@ -6,7 +6,7 @@ from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, Llama
 from typing import Optional, Tuple, Union
 from transformers.cache_utils import Cache
 import logging
-from adaptive_softmax.sftm_pt import adaptiveSoftmax
+from adaptive_softmax.sftm_pt import adaptive_softmax_batched
 
 ##
 import torch
@@ -87,8 +87,7 @@ class LlamaAdaptiveTopKAttention(LlamaAttention):
 
         kv_seq_len = key_states.shape[-2]
 
-
-        attn_weights = adaptiveSoftmax(query_states/math.sqrt(self.head_dim), key_states.transpose(2, 3), self.top_k) 
+        attn_weights = adaptive_softmax_batched(query_states/math.sqrt(self.head_dim), key_states, self.top_k) 
 
         if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
             raise ValueError(
@@ -113,7 +112,7 @@ class LlamaAdaptiveTopKAttention(LlamaAttention):
             attn_weights = attn_weights + causal_mask
 
         # upcast attention to fp32
-        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        # attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
 
@@ -146,7 +145,7 @@ class LlamaAdaptiveTopKAttention(LlamaAttention):
         """Convert all LlamaAttention layers in the model to LlamaTopKAttention."""
         for name, module in reversed(model._modules.items()):
             if len(list(module.children())) > 0:
-                model._modules[name] = LlamaAdaptiveTopKAttention.convert_llama_attention_to_top_k(module, config, top_k=top_k)
+                model._modules[name] = LlamaAdaptiveTopKAttention.convert_llama_attention_to_adaptive_top_k(module, config, top_k=top_k)
 
             if isinstance(module, LlamaAttention):
                 device = next(module.parameters()).device

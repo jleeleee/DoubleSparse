@@ -220,16 +220,12 @@ def get_pred(
                         outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                     )
                     generated_content += [pred_token_idx.item()]
+                    print(f'{tokenizer.decode(pred_token_idx.item(), skip_special_tokens=False)}')
+
                     if pred_token_idx.item() == tokenizer.eos_token_id:
+                        print(f'break')
                         break
 
-            # output = model.generate(
-            #     **input,
-            #     max_new_tokens=max_gen,
-            #     num_beams=1,
-            #     do_sample=False,
-            #     temperature=1.0,
-            # )[0]
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
