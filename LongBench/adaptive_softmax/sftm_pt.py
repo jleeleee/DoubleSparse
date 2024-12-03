@@ -7,33 +7,33 @@ from .bandits_softmax_pt import BanditsSoftmax
 from .utils_pt import fpc
 from .constants import DEFAULT_CI_DECAY, TUNE_EXP_FUDGE_HIGH, TUNE_EXP_FUDGE_LOW, DEFAULT_CI_INIT
 from torch import Tensor
-from torch.profiler import record_function
+# from torch.profiler import record_function
 
 def adaptive_softmax_batched(
     query: torch.Tensor,  # [batch_size, num_heads, seq_length_query, head_dim]
     key: torch.Tensor,    # [batch_size, num_heads, seq_length_key, head_dim ]
     top_k: Optional[int] = None,
 ) -> torch.Tensor:
-    with record_function("adaptive_softmax_batched"):
-        batch_size, num_heads, seq_length_query, head_dim = query.shape
-        _, _, seq_length_key, _ = key.shape
-        device = query.device
-        dtype = query.dtype
-        
-        attn_weights = torch.zeros(batch_size, num_heads, seq_length_query, seq_length_key, device=device, dtype=dtype)
-        for b in range(batch_size):
-            for h in range(num_heads):
-                curr_query = query[b, h]  # [seq_length_query, head_dim]
-                curr_key = key[b, h]      # [seq_length_key, head_dim]
-                sftm = SFTM(curr_key.to(dtype=torch.float32) , temperature=1.0)
+    # with record_function("adaptive_softmax_batched"):
+    batch_size, num_heads, seq_length_query, head_dim = query.shape
+    _, _, seq_length_key, _ = key.shape
+    device = query.device
+    dtype = query.dtype
+    
+    attn_weights = torch.zeros(batch_size, num_heads, seq_length_query, seq_length_key, device=device, dtype=dtype)
+    for b in range(batch_size):
+        for h in range(num_heads):
+            curr_query = query[b, h]  # [seq_length_query, head_dim]
+            curr_key = key[b, h]      # [seq_length_key, head_dim]
+            sftm = SFTM(curr_key.to(dtype=torch.float32) , temperature=1.0)
+            
+            for i in range(seq_length_query):
+                query_vec = curr_query[i].to(dtype=torch.float32)  # [head_dim]
+                k = top_k if top_k is not None and curr_key.shape[0] > top_k else curr_key.shape[0]
+                indices, probabilities, _ = sftm.adaptive_softmax(query_vec, k=k)
+                attn_weights[b, h, i][indices] = probabilities.to(dtype=dtype)
                 
-                for i in range(seq_length_query):
-                    query_vec = curr_query[i].to(dtype=torch.float32)  # [head_dim]
-                    k = top_k if top_k is not None and curr_key.shape[0] > top_k else curr_key.shape[0]
-                    indices, probabilities, _ = sftm.adaptive_softmax(query_vec, k=k)
-                    attn_weights[b, h, i][indices] = probabilities.to(dtype=dtype)
-                    
-        return attn_weights
+    return attn_weights
 
 def adaptiveSoftmax(
     input: Tensor,
