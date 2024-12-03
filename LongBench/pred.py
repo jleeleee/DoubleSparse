@@ -22,6 +22,7 @@ from topk_llama import LlamaTopKAttention
 from modify_llama import convert_kvcache_llama_heavy_recent, convert_llama_channel_config, change_llama_heavy_const
 from h2o_llama import convert_h2o, reset_h2o
 from streaming_llama import convert_streaming
+from adaptive_llama import LlamaAdaptiveTopKAttention
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
@@ -59,6 +60,7 @@ def parse_args(args=None):
     parser.add_argument("--h2o", action="store_true", help="Enable H2O Attention")
     parser.add_argument("--streaming", action="store_true", help="Enable StreamingLLM Attention")
     parser.add_argument("--topk", action="store_true", help="Enable TopK Attention")
+    parser.add_argument("--adaptive", action="store_true", help="Enable Adaptive TopK Attention")
 
     return parser.parse_args(args)
 
@@ -308,7 +310,10 @@ def load_model_and_tokenizer(path, model_name, device):
         k = args.token_budget
         model = LlamaTopKAttention.convert_llama_attention_to_top_k(model, config, top_k=k)
 
-
+    if args.adaptive:
+        config = AutoConfig.from_pretrained(path)
+        k = args.token_budget
+        model = LlamaAdaptiveTopKAttention.convert_llama_attention_to_adaptive_top_k(model, config, top_k=k) 
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)
