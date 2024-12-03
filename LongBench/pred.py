@@ -230,7 +230,7 @@ def get_pred(
                         outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                     )
                     generated_content += [pred_token_idx.item()]
-                    print(f'{tokenizer.decode(pred_token_idx.item(), skip_special_tokens=False)}')
+                    # print(f'{tokenizer.decode(pred_token_idx.item(), skip_special_tokens=False)}')
 
                     if pred_token_idx.item() == tokenizer.eos_token_id:
                         print(f'break')
