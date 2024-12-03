@@ -1,8 +1,8 @@
 import torch
-from hadamard_transform import hadamard_transform as ht
 from math import ceil
 from typing import Union, Tuple
 from .constants import DEFAULT_VAR_PULL_INIT, DEFAULT_VAR_PULL_INCR
+from torch.profiler import record_function
 
 def generate_weighted_permutation(weights: torch.Tensor, gen=None):
     """
@@ -13,29 +13,30 @@ def generate_weighted_permutation(weights: torch.Tensor, gen=None):
     @param gen: The random number generator seed
     @return: The permutation, the logits, and the perturbed logits
     """
-    # print(weights)
-    # assert torch.all(weights >= 0), 'Weights must be non-negative'
-    
-    if gen is not None:
-        torch.manual_seed(gen)
+    with record_function("generate_weighted_permutation"):
+        # print(weights)
+        # assert torch.all(weights >= 0), 'Weights must be non-negative'
+        
+        if gen is not None:
+            torch.manual_seed(gen)
 
-    # Handle log(0) safely by using masked operations
-    total_weight = weights.sum()
-    # print(weights)
-    # print(total_weight)
-    mask = weights > 0
-    logits = torch.full_like(weights, float('-inf'))
-    logits[mask] = torch.log(weights[mask]) - torch.log(total_weight)
-    
-    # Generate Gumbel noise
-    uniform = torch.rand_like(weights)
-    gumbel_noise = -torch.log(-torch.log(uniform))
-    perturbed_logits = logits + gumbel_noise
-    
-    # Get descending order permutation
-    permutation = torch.argsort(perturbed_logits, descending=True)
+        # Handle log(0) safely by using masked operations
+        total_weight = weights.sum()
+        # print(weights)
+        # print(total_weight)
+        mask = weights > 0
+        logits = torch.full_like(weights, float('-inf'))
+        logits[mask] = torch.log(weights[mask]) - torch.log(total_weight)
+        
+        # Generate Gumbel noise
+        uniform = torch.rand_like(weights)
+        gumbel_noise = -torch.log(-torch.log(uniform))
+        perturbed_logits = logits + gumbel_noise
+        
+        # Get descending order permutation
+        permutation = torch.argsort(perturbed_logits, descending=True)
 
-    return permutation, logits, perturbed_logits
+        return permutation, logits, perturbed_logits
 
 class BanditsSoftmax:
     """

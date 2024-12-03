@@ -23,6 +23,8 @@ from modify_llama import convert_kvcache_llama_heavy_recent, convert_llama_chann
 from h2o_llama import convert_h2o, reset_h2o
 from streaming_llama import convert_streaming
 from adaptive_llama import LlamaAdaptiveTopKAttention
+from datetime import datetime
+from torch.profiler import profile, record_function, ProfilerActivity
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
@@ -192,28 +194,37 @@ def get_pred(
                 # NOTE for h2o
                 if args.h2o:
                     reset_h2o(model)
+                print(datetime.now())
                 output = model(
                     input_ids=input.input_ids,
                     past_key_values=None,
                     use_cache=True,
                 )
                 past_key_values = output.past_key_values
+                print(datetime.now())
+                
                 for input_id in q_input.input_ids[0]:
-                    output = model(
-                        input_ids=input_id.unsqueeze(0).unsqueeze(0),
-                        past_key_values=past_key_values,
-                        use_cache=True,
-                    )
-                    past_key_values = output.past_key_values
+                    with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], with_stack=True, record_shapes=True) as prof:
+                        with record_function("model_inference"):
+                            output = model(
+                                input_ids=input_id.unsqueeze(0).unsqueeze(0),
+                                past_key_values=past_key_values,
+                                use_cache=True,
+                            )
+                            past_key_values = output.past_key_values
+                            print(prof.key_averages().table(row_limit=10))
 
+                print(datetime.now())
                 pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                 generated_content = [pred_token_idx.item()]
                 for _ in range(max_gen - 1):
-                    outputs = model(
-                        input_ids=pred_token_idx,
-                        past_key_values=past_key_values,
-                        use_cache=True,
-                    )
+                    with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], record_shapes=True) as prof:
+                        with record_function("model_inference"):
+                            outputs = model(
+                                input_ids=pred_token_idx,
+                                past_key_values=past_key_values,
+                                use_cache=True,
+                            )
 
                     past_key_values = outputs.past_key_values
                     pred_token_idx = (
@@ -310,6 +321,7 @@ def load_model_and_tokenizer(path, model_name, device):
         config = AutoConfig.from_pretrained(path)
         k = args.token_budget
         model = LlamaAdaptiveTopKAttention.convert_llama_attention_to_adaptive_top_k(model, config, top_k=k) 
+
         
     if args.streaming:
         config = AutoConfig.from_pretrained(path)
