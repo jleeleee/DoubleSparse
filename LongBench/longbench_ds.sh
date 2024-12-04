@@ -5,9 +5,9 @@ for task in "musique" "narrativeqa" "qasper"
 do
     for budget in 64 128 256 512 # 1024 2048 4096
     do
-        for q_bits in 4 8
+        for q_bits in 4
         do
-            for group_factor in 4 8
+            for group_factor in 2
             do
                 python -u pred.py \
                     --model $model --task $task \
